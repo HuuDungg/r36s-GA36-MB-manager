@@ -1,5 +1,7 @@
 # WorkaholicSEA — R36S Manager
 
+![App Screenshot](assets/screenshot.png)
+
 A native macOS desktop application designed to manage game files (ROMs) on R36S retro handheld SD cards. 
 
 Because macOS natively blocks modifying FAT32/exFAT partitions that are located behind Ext4/Linux partitions (a common layout for R36S SD cards running ArkOS/AmberELEC), managing games via standard Finder is typically impossible. This application bridges that gap by directly parsing the Master Boot Record (MBR) and utilizing `mtools` to read, write, and manage files without requiring macOS to mount the partition.
