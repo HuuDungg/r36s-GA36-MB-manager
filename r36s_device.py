@@ -220,6 +220,39 @@ class R36SDevice:
         self._connected = True
         return True, "Connected"
 
+    def connect_image(self, img_path: str) -> tuple[bool, str]:
+        """Connect to a local raw .img backup file instead of physical SD card."""
+        if not os.path.isfile(img_path):
+            return False, "File not found"
+
+        sz = os.path.getsize(img_path)
+        offset = self.detect_fat32_offset(img_path)
+        if offset == 0:
+            offset = 1732268032  # fallback
+
+        # Validate with a quick mdir
+        dev_str = f"{img_path}@@{offset}"
+        try:
+            r = subprocess.run(
+                ["mdir", "-i", dev_str, "::/"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if r.returncode != 0:
+                return False, f"Cannot read disk image file.\n{r.stderr.strip()}"
+        except FileNotFoundError:
+            return False, "mtools is not installed.\nRun: brew install mtools"
+        except subprocess.TimeoutExpired:
+            return False, "Timed out reading disk image."
+
+        self.device = DeviceInfo(
+            device_path=img_path,
+            size_bytes=sz,
+            label="Disk Image",
+            fat32_offset=offset
+        )
+        self._connected = True
+        return True, "Connected"
+
     def disconnect(self):
         self._connected = False
         self.device = None
@@ -231,6 +264,50 @@ class R36SDevice:
     def _dev(self) -> str:
         assert self.device
         return f"{self.device.device_path}@@{self.device.fat32_offset}"
+
+    def file_exists(self, remote_path: str) -> bool:
+        if not self.connected:
+            return False
+        remote = f"::/{remote_path.strip('/')}"
+        r = subprocess.run(
+            ["mdir", "-i", self._dev(), remote],
+            capture_output=True
+        )
+        return r.returncode == 0
+
+    def download_file(self, remote_path: str, local_path: str) -> bool:
+        if not self.connected:
+            return False
+        remote = f"::/{remote_path.strip('/')}"
+        r = subprocess.run(
+            ["mcopy", "-i", self._dev(), remote, local_path],
+            capture_output=True
+        )
+        return r.returncode == 0
+
+    def upload_file(self, local_path: str, remote_path: str) -> bool:
+        if not self.connected:
+            return False
+        remote = f"::/{remote_path.strip('/')}"
+        parent = os.path.dirname(remote_path.strip('/'))
+        if parent:
+            subprocess.run(["mmd", "-i", self._dev(), f"::/{parent}"], capture_output=True)
+            
+        r = subprocess.run(
+            ["mcopy", "-i", self._dev(), "-o", local_path, remote],
+            capture_output=True
+        )
+        return r.returncode == 0
+
+    def delete_file(self, remote_path: str) -> bool:
+        if not self.connected:
+            return False
+        remote = f"::/{remote_path.strip('/')}"
+        r = subprocess.run(
+            ["mdel", "-i", self._dev(), remote],
+            capture_output=True
+        )
+        return r.returncode == 0
 
     def list_dir(self, path: str = "/") -> tuple[list[FileEntry], int]:
         """List directory contents. Returns (entries, free_bytes)."""
@@ -304,22 +381,14 @@ class R36SDevice:
         return True, "Deleted"
 
     def delete_dir(self, remote_path: str) -> tuple[bool, str]:
-        """Recursively delete a directory."""
+        """Recursively delete a directory using mdeltree."""
         if not self.connected:
             return False, "Not connected"
 
-        entries, _ = self.list_dir(remote_path)
-        for e in entries:
-            child = f"{remote_path.rstrip('/')}/{e.name}"
-            if e.is_dir:
-                self.delete_dir(child)
-            else:
-                self.delete_file(child)
-
         remote = f"::/{remote_path.strip('/')}"
         r = subprocess.run(
-            ["mrd", "-i", self._dev(), remote],
-            capture_output=True, text=True, timeout=10,
+            ["mdeltree", "-i", self._dev(), remote],
+            capture_output=True, text=True, timeout=30,
         )
         if r.returncode != 0:
             return False, r.stderr.strip()
