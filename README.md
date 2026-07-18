@@ -19,30 +19,34 @@ Because macOS natively blocks modifying FAT32/exFAT partitions that are located 
 
 ## Prerequisites
 - macOS
-- Python 3.9+
-- `mtools` installed via Homebrew
+- **For regular users**: None! The application is distributed as a standalone `.dmg` installer.
+- **For developers/building from source**: Python 3.9+ and `mtools` installed via Homebrew.
 
 ## Installation
 
-1. **Install Dependencies:**
-   ```bash
-   brew install mtools
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
+### Method 1: Standalone Installer (Recommended)
+Download and open `dist/R36S_Manager.dmg`, then drag **R36S Manager.app** to your **Applications** folder. All dependencies (including `mtools` and python binaries) are fully self-contained.
 
-2. **Permissions:**
-   Because the application reads raw disk blocks, it requires administrative privileges to access `/dev/diskX`. The application will instruct you on how to temporarily grant `chmod 777` permissions to your SD card when connected.
+### Method 2: Build or Run from Source
+Use the unified management script `manage.sh`:
+- **Setup Environment**: `./manage.sh setup` (installs python packages and dev requirements).
+- **Run App**: `./manage.sh run`.
+- **Build DMG Installer**: `./manage.sh build`.
+
+Running `./manage.sh` without arguments opens an interactive CLI control panel.
+
+## Permissions
+Because the application reads raw disk blocks, it requires administrative privileges to access `/dev/diskX`. The application will automatically prompt for temporary administrative permissions using standard macOS dialogs when scanning.
 
 ## Usage
-Simply double-click `Start_R36S_Manager.command` to launch the application.
-
-- **Refresh**: Scans for connected SD cards.
+- **Refresh**: Scans for connected physical SD cards.
 - **Add Game**: Opens a file dialog or allows drag-and-drop.
 - **Delete**: Removes the selected ROM.
 - **Eject**: Safely unmounts and ejects the SD card from the system.
 
-## Architecture
-- `app.py`: Contains the PySide6 UI logic, state management, and file drag-and-drop operations.
-- `r36s_device.py`: The core driver layer that handles raw disk scanning, MBR offset parsing, and wraps `mtools` commands (`mcopy`, `mdel`, `mdir`) for seamless read/write operations.
+## Architecture & Project Structure
+- `app.py`: Main application entry point containing PySide6 UI logic, layouts, and drag-and-drop operations.
+- `r36s_device.py`: Handles MBR partition layout parsing, SD card raw sector access, and coordinates with bundled `mtools` executables.
+- `image_editor.py`: Boot partition editor for modifying system assets on backup `.img` disk images.
+- `build_app.py`: Automates compilation of the standalone application bundle and building the DMG installer.
+- `manage.sh`: Interactive command control panel to setup, run, and compile the workspace.

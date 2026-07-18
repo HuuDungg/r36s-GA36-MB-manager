@@ -8,6 +8,14 @@ mount restrictions.
 
 import sys
 import os
+
+# Handle PyInstaller frozen environment for bundled mtools
+if getattr(sys, 'frozen', False):
+    bundle_dir = sys._MEIPASS
+    mtools_bin_dir = os.path.join(bundle_dir, "mtools_bin")
+    if os.path.isdir(mtools_bin_dir):
+        os.environ["PATH"] = mtools_bin_dir + os.pathsep + os.environ["PATH"]
+
 import io
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QSplitter, QTreeWidget, QTreeWidgetItem,
